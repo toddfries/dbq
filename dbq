@@ -144,7 +144,7 @@ sub add {
 }
 
 sub polldb {
-	my $q = "SELECT * from dbq";
+	my $q = "SELECT * from dbq where triggered = 0 order by stop";
 	my $d;
 	my $datenow = Date::Manip::Date->new();
 	my $datedb  = Date::Manip::Date->new();
