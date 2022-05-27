@@ -24,13 +24,15 @@ use Getopt::Std;
 use POSIX qw(getpid);
 use ReadConf;
 use Term::ReadLine;
+use Date::Manip;
 
 our $opt_v; # verbose
 our $opt_c; # config file
+our $opt_p; # poll on/off
 
 $opt_c = $ENV{'HOME'}."/.config/dbq/dbq.conf";
 
-getopts('v:');
+getopts('pv:');
 
 our $v = $opt_v;
 
@@ -46,6 +48,8 @@ my $dbinfo = {
 	user => "",
 	pass => "",
 };
+
+my $dbprep = { };
 
 my $r = ReadConf->new;
 my $config = $r->readconf($opt_c)->{_};
@@ -65,24 +69,142 @@ our $db;
 
 init_db($dbinfo);
 
-my $term = Term::ReadLine->new('dbq', *STDIN, *STDOUT);
-$term->ornaments(0);
+if (defined($opt_p)) {
+	polldb();
+	# notreached
+}
 
-printf "dbq\n";
+our $term = Term::ReadLine->new('dbq', *STDIN, *STDOUT);
+$term->ornaments(0);
 
 my $line;
 while (1) {
 	chomp($line = $term->readline('dbq> '));
+	$line =~ s/^\s+//;
+	$line =~ s/\s+$//;
 	if ($v > 0) {
 		printf "read: '%s'\n", $line;
 	}
 	if ($line =~ /^(exit|quit)$/) {
 		last;
 	}
+	if ($line =~ /^add$/) {
+		add();
+		next;
+	}
+	if ($line =~ /^ls$/) {
+		ls();
+		next;
+	}
 }
 
 exit(0);
 
+sub add {
+
+	my $q = "INSERT INTO dbq (name, dur, stop) values ";
+	$q .=   " (?, ?, ?)";
+
+	my $h = db_prep_alloc('dbq_insert', $q);
+
+	my $name = ask('q name? ');
+	my $str  = ask('q dur? ');
+
+	my $date = Date::Manip::Date->new();
+	my $delta = Date::Manip::Delta->new();
+
+	$date->parse("now");
+	$delta->parse('+'.$str);
+	my $newdate = $date->calc($delta, 0); # add = 0, subtract = 1
+	my $stop = $newdate->printf("%Y-%m-%dT%H:%M:%S");
+	my $dur = $newdate->printf("%s") - $date->printf("%s");
+
+	printf "add name/dur/stop = '%s'/%d/'%s'\n", $name, $dur, $stop;
+
+	my $i=1;
+	my $rv;
+	eval {
+		$rv = $h->bind_param($i++, $name, SQL_CHAR);
+		$rv = $h->bind_param($i++, $dur, SQL_INTEGER);
+		$rv = $h->bind_param($i++, $stop);
+	};
+	if ($@) {
+		printf STDERR "add: bind_param Error: '%s'\n", $@;
+	}
+
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "add: execute Error: '%s'\n", $@;
+	}
+}
+
+sub polldb {
+	my $q = "SELECT * from dbq";
+	my $d;
+	my $datenow = Date::Manip::Date->new();
+	my $datedb  = Date::Manip::Date->new();
+	while (1) {
+		my $sth = $db->doquery($q);
+		if (!defined($sth) || $sth == -1) {
+			return;
+		}
+
+		$datenow->parse("now");
+		while ($d = $sth->fetchrow_hashref) {
+			if ($d->{triggered} > 0) {
+				next;
+			}
+			$datedb->parse($d->{stop});
+			my $cret = $datenow->cmp($datedb);
+			printf "%s  %s  %s : %s\n",
+				$datenow->printf("%Y-%m-%dT%H:%M:%S"),
+				$cret,
+				$datedb->printf("%Y-%m-%dT%H:%M:%S"),
+				$d->{name};
+			if ($cret >= 0) {
+				notify($d);
+			}
+		}
+		sleep(5);
+	}
+	exit(0);
+}
+
+sub ls {
+	my $q = "SELECT * from dbq";
+	my $sth = $db->doquery($q);
+	if (!defined($sth) || $sth == -1) {
+		return;
+	}
+
+	my $d;
+	$d = $sth->fetchrow_hashref;
+	foreach my $col (keys %{$d}) {
+		printf ".. %s", $col;
+	}
+	print "\n";
+	while (1) {
+		if (!defined($d)) {
+			last;
+		}
+		foreach my $col (keys %{$d}) {
+			printf ".. %s", $d->{$col};
+		}
+		print "\n";
+		$d = $sth->fetchrow_hashref;
+	}
+}
+
+sub ask {
+	my ($prompt) = @_;
+	my $ret;
+
+	chomp($ret = $term->readline($prompt));
+	return $ret;
+}
+	
 sub init_db {
 	my ($dbinfo) = @_;
 
@@ -152,6 +274,7 @@ sub init_db {
 		$q .=   "name TEXT unique, ";
 		$q .=   "dur INT, ";
 		$q .=   "stop TIMESTAMP, ";
+		$q .=   "triggered INT default 0, ";
 		$q .=   "cr  TIMESTAMP default now()";
 		$q .=   ")";
 		my $sth = $db->doquery($q);
@@ -160,6 +283,15 @@ sub init_db {
 		$sth = init_db_hash($index_create_re, 'dbq_id_idx',
 			'dbq', 'id');
 	}
+}
+
+sub db_prep_alloc {
+	my ($hname, $prepsql) = @_;
+
+	if (!defined($dbprep->{$hname})) {
+		$dbprep->{$hname} = $db->prepare($prepsql);
+	}
+	return $dbprep->{$hname};
 }
 
 sub init_db_hash {
@@ -174,4 +306,65 @@ sub init_db_hash {
         $re =~ s/%TYPE%/$type/;
 
 	return $db->doquery($re);
+}
+
+sub notify {
+	my ($d) = @_;
+
+	my $datenow = Date::Manip::Date->new();
+	my $delta   = Date::Manip::Delta->new();
+
+	$datenow->parse("now");
+	my $deltastr = $d->{dur}."sec";
+	$delta->parse($deltastr);
+	my $newdate = $datenow->calc($delta, 0);
+
+	# XXX check for shell escapes until perl native notify
+	my $cmd = "xmessage";
+	$cmd .= " -timeout 5";
+	$cmd .= " -center";
+	$cmd .= " -print";
+	#$cmd .= " -buttons Snooze:0,Dismiss:1,Test:2,A:3,B:4,C:5";
+	$cmd .= " -buttons Snooze:0,Dismiss:1,Restart:2";
+	$cmd .= " -default Snooze ";
+	$cmd .= $d->{name}.", time: $deltastr";
+	open(XM,"$cmd|");
+	my $line;
+	while(<XM>) {
+		chomp($line = $_);
+		printf "returned '%s' for %s\n", $line, $d->{name};
+		if ($line eq "Dismiss") {
+			dismiss($d);
+			last;
+		}
+		if ($line eq "Restart") {
+			printf "Restart id %d new end %s\n",
+				$d->{id},
+				$newdate->printf("%Y-%m-%dT%H:%M:%S");
+		}
+	}
+	close(XM);
+}
+
+sub dismiss {
+	my ($d) = @_;
+
+	my $q = "UPDATE dbq SET triggered = ? where id = ?";
+	my $h = db_prep_alloc('dbq_update_trigger', $q);
+	
+	my $i=1;
+	my $rv;
+	eval {
+		$rv = $h->bind_param($i++, 1, SQL_INTEGER);
+		$rv = $h->bind_param($i++, $d->{id}, SQL_INTEGER);
+	};
+	if ($@) {
+		printf STDERR "dismiss: bind_param Error: '%s'\n", $@;
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "dismiss: execute Error: '%s'\n", $@;
+	}
 }
