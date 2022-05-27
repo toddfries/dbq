@@ -100,6 +100,12 @@ while (1) {
 		on();
 		next;
 	}
+	if ($line =~ /^del$/) {
+		del();
+		next;
+	}
+	# rename
+	# arguments .. aka 'ls expired' or 'del 3'
 }
 
 exit(0);
@@ -172,7 +178,7 @@ sub polldb {
 sub on {
 	ls();
 
-	my $id = ask('Which id? ');
+	my $id = ask('Turn on which id? ');
 	my $q = "SELECT * from dbq where id = ?";
 	my $h = db_prep_alloc('dbq_select_id', $q);
 
@@ -240,6 +246,56 @@ sub on {
 	};
 	if ($@) {
 		printf STDERR "on: execute Error: '%s'\n", $@;
+	}
+}
+
+sub del {
+	ls();
+
+	my $id = ask('Delete which id? ');
+	my $q = "SELECT * from dbq where id = ?";
+	my $h = db_prep_alloc('dbq_select_id', $q);
+
+	my $i=1;
+	my $rv;
+	eval {
+		$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+	};
+	if ($@) {
+		printf STDERR "del: bind_param Error: '%s'\n", $@;
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "del: execute Error: '%s'\n", $@;
+	}
+	if (!defined($h) || $h == -1) {
+		return;
+	}
+	my $d = $h->fetchrow_hashref;
+	$h->finish;
+	if (!defined($d)) {
+		return;
+	}
+
+	printf "Deleting id %d, %dsecs, %s\n", $d->{id}, $d->{dur}, $d->{name};
+
+	$q = "DELETE from dbq where id = ?";
+	$h = db_prep_alloc('dbq_del_id', $q);
+
+	$i=1;
+	eval {
+		$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+	};
+	if ($@) {
+		printf STDERR "del: bind_param Error: '%s'\n", $@;
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "del: execute Error: '%s'\n", $@;
 	}
 }
 
