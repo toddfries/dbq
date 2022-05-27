@@ -96,6 +96,10 @@ while (1) {
 		ls();
 		next;
 	}
+	if ($line =~ /^on$/) {
+		on();
+		next;
+	}
 }
 
 exit(0);
@@ -110,22 +114,15 @@ sub add {
 	my $name = ask('q name? ');
 	my $str  = ask('q dur? ');
 
-	my $date = Date::Manip::Date->new();
-	my $delta = Date::Manip::Delta->new();
+	my ($secs,$stop) = durtoss($str);
 
-	$date->parse("now");
-	$delta->parse('+'.$str);
-	my $newdate = $date->calc($delta, 0); # add = 0, subtract = 1
-	my $stop = $newdate->printf("%Y-%m-%dT%H:%M:%S");
-	my $dur = $newdate->printf("%s") - $date->printf("%s");
-
-	printf "add name/dur/stop = '%s'/%d/'%s'\n", $name, $dur, $stop;
+	printf "add name/dur/stop = '%s'/%d/'%s'\n", $name, $secs, $stop;
 
 	my $i=1;
 	my $rv;
 	eval {
 		$rv = $h->bind_param($i++, $name, SQL_CHAR);
-		$rv = $h->bind_param($i++, $dur, SQL_INTEGER);
+		$rv = $h->bind_param($i++, $secs, SQL_INTEGER);
 		$rv = $h->bind_param($i++, $stop);
 	};
 	if ($@) {
@@ -172,28 +169,101 @@ sub polldb {
 	exit(0);
 }
 
+sub on {
+	ls();
+
+	my $id = ask('Which id? ');
+	my $q = "SELECT * from dbq where id = ?";
+	my $h = db_prep_alloc('dbq_select_id', $q);
+
+	my $i=1;
+	my ($rv,$sth);
+	eval {
+		$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+	};
+	if ($@) {
+		printf STDERR "on: bind_param Error: '%s'\n", $@;
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "on: execute Error: '%s'\n", $@;
+	}
+	if (!defined($h) || $h == -1) {
+		return;
+	}
+	my $d = $h->fetchrow_hashref;
+	$h->finish;
+	if (!defined($d)) {
+		return;
+	}
+
+	my ($secs,$stop);
+
+	my $dstr = ask('q dur ['.secstohuman($d->{dur}).']? ');
+	$dstr =~ s/^\s+//;
+	$dstr =~ s/\s+$//;
+
+	if (length($dstr) > 0) {
+		($secs,$stop) = durtoss($dstr);
+		my $q = "UPDATE dbq SET triggered = ?, dur = ?, stop = ? ";
+		$q .=   "where id = ?";
+		$h = db_prep_alloc('update_trigger_dur_stop', $q);
+		$i=1;
+		eval {
+			$rv = $h->bind_param($i++,     0, SQL_INTEGER);
+			$rv = $h->bind_param($i++, $secs, SQL_INTEGER);
+			$rv = $h->bind_param($i++, $stop);
+			$rv = $h->bind_param($i++,   $id, SQL_INTEGER);
+		};
+		if ($@) {
+			printf STDERR "on: bind_param Error: '%s'\n", $@;
+		}
+	} else {
+		($secs,$stop) = durtoss($d->{dur});
+		my $q = "UPDATE dbq SET triggered = ?, stop = ? ";
+		$q .=   "where id = ?";
+		$h = db_prep_alloc('update_trigger_stop', $q);
+		$i=1;
+		eval {
+			$rv = $h->bind_param($i++,   0, SQL_INTEGER);
+			$rv = $h->bind_param($i++, $stop);
+			$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+		};
+		if ($@) {
+			printf STDERR "on: bind_param Error: '%s'\n", $@;
+		}
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "on: execute Error: '%s'\n", $@;
+	}
+}
+
 sub ls {
-	my $q = "SELECT * from dbq";
+	my $q = "SELECT * from dbq order by id";
 	my $sth = $db->doquery($q);
 	if (!defined($sth) || $sth == -1) {
 		return;
 	}
+	# header:
+	#            '   11. 0 100day 59min 59secs 2022-09-04 14:35:30 testing2'
+	my $header = "Timer  Expired?  Duration    Stop Time           Description";
+	printf "%s\n", $header;
 
 	my $d;
-	$d = $sth->fetchrow_hashref;
-	foreach my $col (keys %{$d}) {
-		printf ".. %s", $col;
-	}
-	print "\n";
-	while (1) {
-		if (!defined($d)) {
-			last;
-		}
-		foreach my $col (keys %{$d}) {
-			printf ".. %s", $d->{$col};
-		}
-		print "\n";
-		$d = $sth->fetchrow_hashref;
+	while ($d = $sth->fetchrow_hashref) {
+
+		my $dstr = secstohuman( $d->{dur} );
+
+		# '100day 59min 59secs' is 19c
+
+		printf "%5d. %d %19s %s %s\n", $d->{id},
+			$d->{triggered},
+			$dstr, $d->{stop}, $d->{name};
 	}
 }
 
@@ -349,8 +419,7 @@ sub notify {
 sub dismiss {
 	my ($d) = @_;
 
-	my $q = "UPDATE dbq SET triggered = ? where id = ?";
-	my $h = db_prep_alloc('dbq_update_trigger', $q);
+	my $h = update_trigger_q();
 	
 	my $i=1;
 	my $rv;
@@ -367,4 +436,65 @@ sub dismiss {
 	if ($@) {
 		printf STDERR "dismiss: execute Error: '%s'\n", $@;
 	}
+}
+
+sub update_trigger_q {
+	my $q = "UPDATE dbq SET triggered = ? where id = ?";
+	return db_prep_alloc('dbq_update_trigger', $q);
+}
+	
+
+sub secstohuman {
+		my ($duration) = @_;
+
+		my ($day,$hour,$min,$sec) = secstodhms( $duration );
+
+		my $dstr = "";
+		if ($day > 0) {
+			$dstr .= " ${day}day";
+		}
+		if ($hour > 0) {
+			$dstr .= " ${hour}hour";
+		}
+		if ($min > 0) {
+			$dstr .= " ${min}min";
+		}
+		if ($sec > 0) {
+			$dstr .= " ${sec}secs";
+		} elsif ($sec < 1 && length($dstr) < 1) {
+			$dstr .= " ${sec}secs";
+		}
+
+		$dstr =~ s/^\s+//;
+		$dstr =~ s/\s+$//;
+
+		return $dstr;
+}
+
+sub secstodhms {
+	my ($secs) = @_;
+
+	my ($d, $h,$m,$s);
+	$d = POSIX::floor( $secs / (24*60*60) );
+	$h = POSIX::floor( ( $secs - $d * (24*60*60) ) / 3600 );
+	$m = POSIX::floor( ( $secs - $d * (24*60*60) - $h * (60*60) ) / 60 );
+	$s = $secs - $d * (24*60*60) - $h * (60*60) - $m * 60;
+
+	return ($d, $h, $m, $s);
+}
+
+# Duration (from now) to Seconds and Stop Time
+sub durtoss {
+	my ($str) = @_;
+
+	my $date = Date::Manip::Date->new();
+	my $delta = Date::Manip::Delta->new();
+
+	$date->parse("now");
+	$delta->parse('+'.$str);
+	my $newdate = $date->calc($delta, 0); # add = 0, subtract = 1
+	my $stop = $newdate->printf("%Y-%m-%dT%H:%M:%S");
+	my $dur = $newdate->printf("%s") - $date->printf("%s");
+
+	return ($dur,$stop);
 }
