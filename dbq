@@ -1,0 +1,177 @@
+#!/usr/bin/perl
+
+# Copyright (c) 2022 Todd T. Fries <todd@fries.net>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+use strict;
+use warnings;
+
+use DBD::Pg qw(:pg_types);
+use DBI qw(:sql_types);
+use FDC::db;
+use Getopt::Std;
+use POSIX qw(getpid);
+use ReadConf;
+use Term::ReadLine;
+
+our $opt_v; # verbose
+our $opt_c; # config file
+
+$opt_c = $ENV{'HOME'}."/.config/dbq/dbq.conf";
+
+getopts('v:');
+
+our $v = $opt_v;
+
+if (!defined($v)) {
+	$v = 0;
+}
+if (! -f $opt_c) {
+	die "conf file '${opt_c}' EEXIST";
+}
+
+my $dbinfo = {
+	dsn => "",
+	user => "",
+	pass => "",
+};
+
+my $r = ReadConf->new;
+my $config = $r->readconf($opt_c)->{_};
+if (defined($config)) {
+	foreach my $id (keys %{$dbinfo}) {
+		if (defined($config->{$id})) {
+			$dbinfo->{$id} = $config->{$id};
+		}
+	}
+}
+
+foreach my $id (keys %{$dbinfo}) {
+	printf "dbinfo=>{%s} = '%s'\n", $id, $dbinfo->{$id};
+}
+
+our $db;
+
+init_db($dbinfo);
+
+my $term = Term::ReadLine->new('dbq', *STDIN, *STDOUT);
+$term->ornaments(0);
+
+printf "dbq\n";
+
+my $line;
+while (1) {
+	chomp($line = $term->readline('dbq> '));
+	if ($v > 0) {
+		printf "read: '%s'\n", $line;
+	}
+	if ($line =~ /^(exit|quit)$/) {
+		last;
+	}
+}
+
+exit(0);
+
+sub init_db {
+	my ($dbinfo) = @_;
+
+	use DBI::Const::GetInfoType;
+	
+	$db = FDC::db->new($dbinfo->{dsn}, $dbinfo->{user}, $dbinfo->{pass});
+
+	if (!defined($db)) {
+		die "db connection error!";
+	}
+
+	my $dbmsname = $db->getdbh()->get_info( $GetInfoType{SQL_DBMS_NAME} );
+	my $dbmsver  = $db->getdbh()->get_info( $GetInfoType{SQL_DBMS_VER} );
+	my $oidname  = $db->oidname();
+
+	my $dsn = $dbinfo->{dsn};
+	if (defined($dsn)) {
+		if ($dsn =~ /dbname=([^;]+)/) {
+			$dbinfo->{dbname} = $1;
+		}
+	}
+	if (!defined($dbinfo->{dbname})) {
+		$dbinfo->{dbname} = "?";
+	}
+
+	printf "Connected to dsn '%s' .. dbms name '%s' ver '%s' .. oidname '%s'\n",
+		$dbinfo->{dsn}, $dbmsname, $dbmsver, $oidname;
+
+	my @tables;
+
+	my ($serialtype,$blobtype,$tablere,$index_create_re);
+	if ($dbmsname eq "PostgreSQL") {
+		$serialtype = "serial";
+		$blobtype = "bytea";
+		$tablere = '\\.%name%$';
+		$db->{stats}->{pgsz} = 1;
+		$db->{get}->{dbsz} = "SELECT  pg_database_size(datname) db_size FROM pg_database where datname = '";
+		$db->{get}->{dbsz} .= $dbinfo->{dbname};
+		$db->{get}->{dbsz} .= "' ORDER BY db_size";
+		$db->{stats}->{pgct} = $db->do_oneret_query($db->{get}->{dbsz});
+		$db->{bbt} = { pg_type => PG_BYTEA };
+		$index_create_re = "CREATE %TYPE% INDEX %NAME% ON %TABLE% using btree ( %PARAMS% )";
+		$db->do("SET application_name = '?/".getpid()."'");
+	} else {
+		die "Unhandled dbmsname ${dbmsname}";
+	}
+
+	@tables = $db->tables();
+
+	my %tablefound;
+	foreach my $tname (@tables) {
+		if ($tname =~ /^(information_schema|pg_catalog)\./) {
+			next;
+		}
+		foreach my $tn (('dbq')) {
+			my $tre = $tablere;
+			$tre =~ s/%name%/$tn/g;
+			if ($tname =~ m/$tre/) {
+				$tablefound{$tn} = 1;
+			}
+		}
+	}
+
+	if (!defined($tablefound{'dbq'})) {
+		my $q = "CREATE TABLE dbq (";
+		$q .=   "id ${serialtype}, ";
+		$q .=   "name TEXT unique, ";
+		$q .=   "dur INT, ";
+		$q .=   "stop TIMESTAMP, ";
+		$q .=   "cr  TIMESTAMP default now()";
+		$q .=   ")";
+		my $sth = $db->doquery($q);
+		$sth = init_db_hash($index_create_re, 'dbq_name_idx',
+			'dbq', 'name', 'UNIQUE');
+		$sth = init_db_hash($index_create_re, 'dbq_id_idx',
+			'dbq', 'id');
+	}
+}
+
+sub init_db_hash {
+	my ($re, $name, $table, $param, $type) = @_;
+
+	if (!defined($type)) {
+		$type = "";
+	}
+        $re =~ s/%NAME%/$name/;
+        $re =~ s/%TABLE%/$table/;
+        $re =~ s/%PARAMS%/$param/;
+        $re =~ s/%TYPE%/$type/;
+
+	return $db->doquery($re);
+}
