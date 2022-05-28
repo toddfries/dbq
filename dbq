@@ -122,7 +122,9 @@ sub add {
 
 	my ($secs,$stop) = durtoss($str);
 
-	printf "add name/dur/stop = '%s'/%d/'%s'\n", $name, $secs, $stop;
+	if ($v>0) {
+		printf "add name/dur/stop = '%s'/%d/'%s'\n", $name, $secs, $stop;
+	}
 
 	my $i=1;
 	my $rv;
@@ -161,11 +163,13 @@ sub polldb {
 			}
 			$datedb->parse($d->{stop});
 			my $cret = $datenow->cmp($datedb);
+			if ($v>0) {
 			printf "%s  %s  %s : %s\n",
 				$datenow->printf("%Y-%m-%dT%H:%M:%S"),
 				$cret,
 				$datedb->printf("%Y-%m-%dT%H:%M:%S"),
 				$d->{name};
+			}
 			if ($cret >= 0) {
 				notify($d);
 			}
@@ -445,12 +449,28 @@ sub notify {
 	$delta->parse($deltastr);
 	my $newdate = $datenow->calc($delta, 0);
 
+	if (defined($ENV{'DISPLAY'})) {
+		xmessage($d, $deltastr, $newdate);
+	} else {
+		tmessage($d, $deltastr, $newdate);
+	}
+}
+sub tmessage {
+	my ($d, $deltastr) = @_;
+
+	print "\n";
+	printf " --> %s : %s\n", $deltastr, $d->{name};
+	print "\n";
+}
+
+sub xmessage {
+	my ($d, $deltastr, $newdate) = @_;
+
 	# XXX check for shell escapes until perl native notify
 	my $cmd = "xmessage";
 	$cmd .= " -timeout 5";
 	$cmd .= " -center";
 	$cmd .= " -print";
-	#$cmd .= " -buttons Snooze:0,Dismiss:1,Test:2,A:3,B:4,C:5";
 	$cmd .= " -buttons Snooze:0,Dismiss:1,Restart:2";
 	$cmd .= " -default Snooze ";
 	$cmd .= $d->{name}.", time: $deltastr";
