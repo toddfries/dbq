@@ -19,12 +19,12 @@ use warnings;
 
 use DBD::Pg qw(:pg_types);
 use DBI qw(:sql_types);
+use Date::Manip;
 use FDC::db;
 use Getopt::Std;
 use POSIX qw(getpid);
 use ReadConf;
 use Term::ReadLine;
-use Date::Manip;
 
 our $opt_v; # verbose
 our $opt_c; # config file
