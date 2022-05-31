@@ -96,15 +96,18 @@ while (1) {
 		ls($1);
 		next;
 	}
-	if ($line =~ /^on$/) {
-		on();
+	if ($line =~ /^on($|\s.*)$/) {
+		on($1);
+		next;
+	}
+	if ($line =~ /^rename($|\s.*)$/) {
+		dbq_rename($1);
 		next;
 	}
 	if ($line =~ /^del$/) {
 		del();
 		next;
 	}
-	# rename
 	# arguments .. aka 'ls expired' or 'del 3'
 }
 
@@ -180,9 +183,11 @@ sub polldb {
 }
 
 sub on {
-	ls();
+	my ($args) = @_;
+	ls($args);
 
-	my $id = ask('Turn on which id [#, break]? ');
+	my $id;
+	$id = ask('Turn on which id [#, break]? ');
 	if ($id eq "break") {
 		return;
 	}
@@ -211,11 +216,9 @@ sub on {
 	if (!defined($d)) {
 		return;
 	}
-	printf "Turning on '%s'\n", $d->{name};
-
 	my ($secs,$stop);
 
-	my $dstr = ask('q dur ['.secstohuman($d->{dur}).']? ');
+	my $dstr = ask('q dur "'.$d->{name}.'" ['.secstohuman($d->{dur}).']? ');
 	$dstr =~ s/^\s+//;
 	$dstr =~ s/\s+$//;
 
@@ -255,12 +258,79 @@ sub on {
 	if ($@) {
 		printf STDERR "on: execute Error: '%s'\n", $@;
 	}
+	$h->finish();
+}
+
+sub dbq_rename {
+	my ($args) = @_;
+	ls($args);
+
+	my $id;
+	$id = ask('Rename which id [#, break]? ');
+	if ($id eq "break") {
+		return;
+	}
+	my $q = "SELECT * from dbq where id = ?";
+	my $h = db_prep_alloc('dbq_select_id', $q);
+
+	my $i=1;
+	my ($rv,$sth);
+	eval {
+		$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+	};
+	if ($@) {
+		printf STDERR "rename: bind_param Error: '%s'\n", $@;
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "rename: execute Error: '%s'\n", $@;
+	}
+	if (!defined($h) || $h == -1) {
+		return;
+	}
+	my $d = $h->fetchrow_hashref;
+	$h->finish;
+	if (!defined($d)) {
+		return;
+	}
+	my ($secs,$stop);
+
+	my $newname = ask('q rename "'.$d->{name}.'" to? ');
+	$newname =~ s/^\s+//;
+	$newname =~ s/\s+$//;
+
+	if (length($newname) > 0) {
+		my $q = "UPDATE dbq SET name = ? ";
+		$q .=   "where id = ?";
+		$h = db_prep_alloc('rename', $q);
+		$i=1;
+		eval {
+			$rv = $h->bind_param($i++, $newname, SQL_CHAR);
+			$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+		};
+		if ($@) {
+			printf STDERR "rename: bind_param Error: '%s'\n", $@;
+		}
+	} else {
+		printf STDERR "No new name update\n";
+		$h->finish();
+	}
+	eval {
+		$rv = $h->execute();
+	};
+	if ($@) {
+		printf STDERR "on: execute Error: '%s'\n", $@;
+	}
+	$h->finish();
 }
 
 sub del {
 	ls();
 
-	my $id = ask('Delete which id? ');
+	my $id;
+	$id = ask('Delete which id? ');
 	my $q = "SELECT * from dbq where id = ?";
 	my $h = db_prep_alloc('dbq_select_id', $q);
 
