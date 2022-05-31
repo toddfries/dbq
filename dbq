@@ -92,8 +92,8 @@ while (1) {
 		add();
 		next;
 	}
-	if ($line =~ /^ls$/) {
-		ls();
+	if ($line =~ /^ls($|\s.*)$/) {
+		ls($1);
 		next;
 	}
 	if ($line =~ /^on$/) {
@@ -182,7 +182,10 @@ sub polldb {
 sub on {
 	ls();
 
-	my $id = ask('Turn on which id? ');
+	my $id = ask('Turn on which id [#, break]? ');
+	if ($id eq "break") {
+		return;
+	}
 	my $q = "SELECT * from dbq where id = ?";
 	my $h = db_prep_alloc('dbq_select_id', $q);
 
@@ -208,6 +211,7 @@ sub on {
 	if (!defined($d)) {
 		return;
 	}
+	printf "Turning on '%s'\n", $d->{name};
 
 	my ($secs,$stop);
 
@@ -304,6 +308,15 @@ sub del {
 }
 
 sub ls {
+	my ($args) = @_;
+	my $re;
+	if (defined($args)) {
+		$args =~ s/^\s+//;
+		printf "ls with args! '%s'\n", $args;
+		if ($args =~ /^\/(.*)\/$/) {
+			$re = $1;
+		}
+	}
 	my $q = "SELECT * from dbq order by id";
 	my $sth = $db->doquery($q);
 	if (!defined($sth) || $sth == -1) {
@@ -316,6 +329,11 @@ sub ls {
 
 	my $d;
 	while ($d = $sth->fetchrow_hashref) {
+		if (defined($re)) {
+			if (! ($d->{name} =~ /${re}/)) {
+				next;
+			}
+		}
 
 		my $dstr = secstohuman( $d->{dur} );
 
@@ -456,10 +474,10 @@ sub notify {
 	}
 }
 sub tmessage {
-	my ($d, $deltastr) = @_;
+	my ($d, $deltastr, $newdate) = @_;
 
 	print "\n";
-	printf " --> %s : %s\n", $deltastr, $d->{name};
+	printf " %s --> %s : %s\n", $newdate->printf("%Y%m%dT%H:%M:%S"), $deltastr, $d->{name};
 	print "\n";
 }
 
