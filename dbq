@@ -100,6 +100,10 @@ while (1) {
 		on($1);
 		next;
 	}
+	if ($line =~ /^off($|\s.*)$/) {
+		off($1);
+		next;
+	}
 	if ($line =~ /^rename($|\s.*)$/) {
 		dbq_rename($1);
 		next;
@@ -183,59 +187,72 @@ sub polldb {
 }
 
 sub on {
-	my ($args) = @_;
+	_onoff(0, @_);
+}
+sub off {
+	_onoff(1, @_);
+}
+
+sub _onoff {
+	my ($state, $args) = @_;
+	my $sname;
+	if ($state == 1) {
+		$sname = "off";
+	} elsif ($state == 0) {
+		$sname = "on";
+	} else {
+		printf "_onoff: Uh oh, invalid state: '%s'\n", $state;
+		return;
+	}
 	my @ids = ls($args);
 
+
+	if (!@ids) {
+		printf "Uh oh, empty list, ENOTFOUND\n";
+		return;
+	}
+
 	my $id;
-	$id = ask('Turn on which id [#, break]? ');
+	$id = ask('Turn ${sname} which id [#, break]? ');
 	if ($id eq "break") {
 		return;
 	}
-	my $match = 0;
+	my $match;
 	foreach my $listid (@ids) {
 		if ($listid->{id} == $id) {
-			$match = 1;
+			$match = $listid;
 			last;
 		}
 	}
-	if ($match < 1) {
-		printf "Uh oh, '%s' not in list, ENOTADVISED\n", $id;
+	if (!defined($match)) {
+		printf "${sname}: Uh oh, '%s' not in list, ENOTADVISED\n", $id;
 		return;
 	}
-	my $q = "SELECT * from dbq where id = ?";
-	my $h = db_prep_alloc('dbq_select_id', $q);
 
-	my $i=1;
-	my ($rv,$sth);
-	eval {
-		$rv = $h->bind_param($i++, $id, SQL_INTEGER);
-	};
-	if ($@) {
-		printf STDERR "on: bind_param Error: '%s'\n", $@;
-	}
-	eval {
-		$rv = $h->execute();
-	};
-	if ($@) {
-		printf STDERR "on: execute Error: '%s'\n", $@;
-	}
-	if (!defined($h) || $h == -1) {
-		return;
-	}
-	my $d = $h->fetchrow_hashref;
-	$h->finish;
-	if (!defined($d)) {
-		return;
-	}
-	my ($secs,$stop);
+	my ($secs,$stop, $dstr);
 
-	my $dstr = ask('q dur "'.$d->{name}.'" ['.secstohuman($d->{dur}).']? ');
-	$dstr =~ s/^\s+//;
-	$dstr =~ s/\s+$//;
+	if ($state == 0) {
 
-	if (length($dstr) > 0) {
+		$dstr = ask('q dur "'.$match->{name}.'" ['.secstohuman($match->{dur}).']? ');
+		$dstr =~ s/^\s+//;
+		$dstr =~ s/\s+$//;
+	}
+	my ($q,$h,$i,$rv);
+	if ($state == 1) {
+		$q = "UPDATE dbq SET triggered = ? ";
+		$q .=   "where id = ?";
+		$h = db_prep_alloc('update_trigger', $q);
+		$i=1;
+		eval {
+			$rv = $h->bind_param($i++,   1, SQL_INTEGER);
+			$rv = $h->bind_param($i++, $id, SQL_INTEGER);
+		};
+		if ($@) {
+			printf STDERR "on: bind_param Error: '%s'\n", $@;
+		}
+	} elsif (length($dstr) > 0) {
 		($secs,$stop) = durtoss($dstr);
-		my $q = "UPDATE dbq SET triggered = ?, dur = ?, stop = ? ";
+		$q = "UPDATE dbq SET triggered = ?, dur = ?, stop = ? ";
 		$q .=   "where id = ?";
 		$h = db_prep_alloc('update_trigger_dur_stop', $q);
 		$i=1;
@@ -249,8 +266,8 @@ sub on {
 			printf STDERR "on: bind_param Error: '%s'\n", $@;
 		}
 	} else {
-		($secs,$stop) = durtoss($d->{dur});
-		my $q = "UPDATE dbq SET triggered = ?, stop = ? ";
+		($secs,$stop) = durtoss($match->{dur});
+		$q = "UPDATE dbq SET triggered = ?, stop = ? ";
 		$q .=   "where id = ?";
 		$h = db_prep_alloc('update_trigger_stop', $q);
 		$i=1;
@@ -392,6 +409,7 @@ sub ls {
 	my ($args) = @_;
 	my $re;
 	my $filter = "";
+	my $sort = "id";
 	my @ids;
 	if (defined($args)) {
 		$args =~ s/^\s+//;
@@ -408,6 +426,10 @@ sub ls {
 					$filter .= " triggered = 1";
 					next;
 				}
+				if ($arg eq "-t") {
+					$sort = "stop";
+					next;
+				}
 				printf "ls: unmatched arg '%s'\n", $arg;
 			}
 			if (length($filter) > 0) {
@@ -416,7 +438,7 @@ sub ls {
 		
 		}
 	}
-	my $q = "SELECT * from dbq".$filter." order by id";
+	my $q = "SELECT * from dbq".$filter." order by ".$sort;
 	my $sth = $db->doquery($q);
 	if (!defined($sth) || $sth == -1) {
 		return;
