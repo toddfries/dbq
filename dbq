@@ -215,12 +215,12 @@ sub _onoff {
 	my $id;
 	if ($#ids == 0) {
 		my $one = $ids[0]->{id};
-		$id = ask('Turn ${sname} which id (#, break) ['.$one.'] ? ');
+		$id = ask('Turn '.$sname.' which id (#, break) ['.$one.'] ? ');
 		if ($id =~ /^\s?$/) {
 			$id = $one;
 		}
 	} else {
-		$id = ask('Turn ${sname} which id (#, break)? ');
+		$id = ask('Turn '.$sname.' which id (#, break)? ');
 	}
 	if ($id eq "break") {
 		return;
@@ -429,7 +429,9 @@ sub ls {
 	my @ids;
 	if (defined($args)) {
 		$args =~ s/^\s+//;
-		printf "ls with args! '%s'\n", $args;
+		if ($v>0) {
+			printf "ls with args! '%s'\n", $args;
+		}
 		if ($args =~ /^\/(.*)\/$/) {
 			$re = $1;
 		} else {
@@ -462,7 +464,7 @@ sub ls {
 	# header:
 	#            '   11. 0 100day 59min 59secs 2022-09-04 14:35:30 testing2'
 	my $header = "Timer  Expired?  Duration    Stop Time           Description";
-	printf "%s\n", $header;
+	printf "\n%s\n", $header;
 
 	my $d;
 	while ($d = $sth->fetchrow_hashref) {
