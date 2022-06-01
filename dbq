@@ -184,11 +184,22 @@ sub polldb {
 
 sub on {
 	my ($args) = @_;
-	ls($args);
+	my @ids = ls($args);
 
 	my $id;
 	$id = ask('Turn on which id [#, break]? ');
 	if ($id eq "break") {
+		return;
+	}
+	my $match = 0;
+	foreach my $listid (@ids) {
+		if ($listid->{id} == $id) {
+			$match = 1;
+			last;
+		}
+	}
+	if ($match < 1) {
+		printf "Uh oh, '%s' not in list, ENOTADVISED\n", $id;
 		return;
 	}
 	my $q = "SELECT * from dbq where id = ?";
@@ -381,6 +392,7 @@ sub ls {
 	my ($args) = @_;
 	my $re;
 	my $filter = "";
+	my @ids;
 	if (defined($args)) {
 		$args =~ s/^\s+//;
 		printf "ls with args! '%s'\n", $args;
@@ -421,6 +433,7 @@ sub ls {
 				next;
 			}
 		}
+		push @ids, $d;
 
 		my $dstr = secstohuman( $d->{dur} );
 
@@ -430,6 +443,7 @@ sub ls {
 			$d->{triggered},
 			$dstr, $d->{stop}, $d->{name};
 	}
+	return @ids;
 }
 
 sub ask {
