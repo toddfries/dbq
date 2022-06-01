@@ -88,8 +88,8 @@ while (1) {
 	if ($line =~ /^(exit|quit)$/) {
 		last;
 	}
-	if ($line =~ /^add$/) {
-		add();
+	if ($line =~ /^add($|\s.*)$/) {
+		add($1);
 		next;
 	}
 	if ($line =~ /^ls($|\s.*)$/) {
@@ -104,8 +104,8 @@ while (1) {
 		dbq_rename($1);
 		next;
 	}
-	if ($line =~ /^del$/) {
-		del();
+	if ($line =~ /^del($|\s.*)$/) {
+		del($1);
 		next;
 	}
 	# arguments .. aka 'ls expired' or 'del 3'
@@ -380,14 +380,31 @@ sub del {
 sub ls {
 	my ($args) = @_;
 	my $re;
+	my $filter = "";
 	if (defined($args)) {
 		$args =~ s/^\s+//;
 		printf "ls with args! '%s'\n", $args;
 		if ($args =~ /^\/(.*)\/$/) {
 			$re = $1;
+		} else {
+			foreach my $arg (split(/\s+/, $args)) {
+				if ($arg eq "on") {
+					$filter .= " triggered = 0";
+					next;
+				}
+				if ($arg eq "off") {
+					$filter .= " triggered = 1";
+					next;
+				}
+				printf "ls: unmatched arg '%s'\n", $arg;
+			}
+			if (length($filter) > 0) {
+				$filter = " WHERE".$filter;
+			}
+		
 		}
 	}
-	my $q = "SELECT * from dbq order by id";
+	my $q = "SELECT * from dbq".$filter." order by id";
 	my $sth = $db->doquery($q);
 	if (!defined($sth) || $sth == -1) {
 		return;
