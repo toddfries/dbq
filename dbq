@@ -213,7 +213,15 @@ sub _onoff {
 	}
 
 	my $id;
-	$id = ask('Turn ${sname} which id [#, break]? ');
+	if ($#ids == 0) {
+		my $one = $ids[0]->{id};
+		$id = ask('Turn ${sname} which id (#, break) ['.$one.'] ? ');
+		if ($id =~ /^\s?$/) {
+			$id = $one;
+		}
+	} else {
+		$id = ask('Turn ${sname} which id (#, break)? ');
+	}
 	if ($id eq "break") {
 		return;
 	}
@@ -291,10 +299,17 @@ sub _onoff {
 
 sub dbq_rename {
 	my ($args) = @_;
-	ls($args);
-
+	my @ids = ls($args);
 	my $id;
-	$id = ask('Rename which id [#, break]? ');
+	if ($#ids == 0) {
+		my $one = $ids[0]->{id};
+		$id = ask('Rename which id (#, break) ['.$one.'] ? ');
+		if ($id =~ /^\s?$/) {
+			$id = $one;
+		}
+	} else {
+		$id = ask('Rename which id (#, break)? ');
+	}
 	if ($id eq "break") {
 		return;
 	}
@@ -355,7 +370,8 @@ sub dbq_rename {
 }
 
 sub del {
-	ls();
+	my ($args) = @_;
+	my @ids = ls($args);
 
 	my $id;
 	$id = ask('Delete which id? ');
