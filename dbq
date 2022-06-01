@@ -458,6 +458,9 @@ sub ls {
 		push @ids, $d;
 
 		my $dstr = secstohuman( $d->{dur} );
+		if (!defined($dstr)) {
+			$dstr = $d->{dur}."secs ENOPARSE";
+		}
 
 		# '100day 59min 59secs' is 19c
 
