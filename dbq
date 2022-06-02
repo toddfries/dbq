@@ -51,6 +51,8 @@ my $dbinfo = {
 
 my $dbprep = { };
 
+my $memcache = { };
+
 my $r = ReadConf->new;
 my $config = $r->readconf($opt_c)->{_};
 if (defined($config)) {
@@ -426,6 +428,7 @@ sub ls {
 	my $re;
 	my $filter = "";
 	my $sort = "id";
+	my $durtype = "dur"; # dur or left
 	my @ids;
 	if (defined($args)) {
 		$args =~ s/^\s+//;
@@ -444,8 +447,16 @@ sub ls {
 					$filter .= " triggered = 1";
 					next;
 				}
+				if ($arg eq "left") {
+					$durtype = "left";
+					next;
+				}
 				if ($arg eq "-t") {
 					$sort = "stop";
+					next;
+				}
+				if ($arg =~ /^\/(.*)\/$/) {
+					$re = $1;
 					next;
 				}
 				printf "ls: unmatched arg '%s'\n", $arg;
@@ -475,10 +486,26 @@ sub ls {
 		}
 		push @ids, $d;
 
-		my $dstr = secstohuman( $d->{dur} );
-		if (!defined($dstr)) {
-			$dstr = $d->{dur}."secs ENOPARSE";
+		my $dstr;
+		if ($durtype eq "left") {
+			my $datenow = Date::Manip::Date->new();
+			my $dateend = Date::Manip::Date->new();
+
+			$datenow->parse("now");
+			$dateend->parse($d->{stop});
+			my $insecs = $dateend->printf("%s") - 
+				$datenow->printf("%s");
+			$dstr = secstohuman( $insecs );
+			if (!defined($dstr)) {
+				$dstr = $insecs."secs ENOPARSE";
+			}
+		} else {
+			$dstr = secstohuman( $d->{dur} );
+			if (!defined($dstr)) {
+				$dstr = $d->{dur}."secs ENOPARSE";
+			}
 		}
+
 
 		# '100day 59min 59secs' is 19c
 
@@ -620,9 +647,20 @@ sub notify {
 sub tmessage {
 	my ($d, $deltastr, $newdate) = @_;
 
+	my $id = $d->{id};
+	if (defined($memcache->{$id})) {
+		if ($d->{stop} eq $memcache->{$id}->{stop}) {
+			# we have notified for this before, once
+			return;
+		}
+	}
+	$memcache->{$id} = $d;
+
 	print "\n";
 	printf " %s --> %s : %s\n", $newdate->printf("%Y%m%dT%H:%M:%S"), $deltastr, $d->{name};
 	print "\n";
+	my $str = sprintf("dremind +2sec '%s'", $d->{name});
+	system($str);
 }
 
 sub xmessage {
@@ -689,16 +727,24 @@ sub secstohuman {
 
 		my $dstr = "";
 		if ($day > 0) {
+			$dstr .= " ${day}days";
+		} elsif ($day == 1) {
 			$dstr .= " ${day}day";
 		}
-		if ($hour > 0) {
+		if ($hour > 1) {
+			$dstr .= " ${hour}hours";
+		} elsif ($hour == 1) {
 			$dstr .= " ${hour}hour";
 		}
-		if ($min > 0) {
+		if ($min > 1) {
+			$dstr .= " ${min}mins";
+		} elsif ($min == 1) {
 			$dstr .= " ${min}min";
 		}
-		if ($sec > 0) {
+		if ($sec > 1) {
 			$dstr .= " ${sec}secs";
+		} elsif ( $sec == 1) {
+			$dstr .= " ${sec}sec";
 		} elsif ($sec < 1 && length($dstr) < 1) {
 			$dstr .= " ${sec}secs";
 		}
