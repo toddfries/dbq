@@ -656,9 +656,7 @@ sub tmessage {
 	}
 	$memcache->{$id} = $d;
 
-	print "\n";
 	printf " %s --> %s : %s\n", $newdate->printf("%Y%m%dT%H:%M:%S"), $deltastr, $d->{name};
-	print "\n";
 	my $str = sprintf("dremind +2sec '%s'", $d->{name});
 	system($str);
 }
