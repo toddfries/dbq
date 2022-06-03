@@ -97,10 +97,15 @@ Finally, you'll need to start it:
 Commands at the `dbq>` prompt are as follows:
 
 `ls <filter>     : ` show entries
+
 `on <filter>     : ` turn on and reset timer for entries
+
 `off <filter>    : ` turn off timer for an entry
+
 `add             : ` add a new timer
+
 `rename <filter> : ` rename an existing timer
+
 `del <filter>    : ` delete a timer entry entirely
 
 `<filter>` breaks down to one or more of the following:
