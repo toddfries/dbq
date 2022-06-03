@@ -94,6 +94,25 @@ Finally, you'll need to start it:
 	$
 ```
 
+Commands at the `dbq>` prompt are as follows:
+
+`ls <filter>     : ` show entries
+`on <filter>     : ` turn on and reset timer for entries
+`off <filter>    : ` turn off timer for an entry
+`add             : ` add a new timer
+`rename <filter> : ` rename an existing timer
+`del <filter>    : ` delete a timer entry entirely
+
+`<filter>` breaks down to one or more of the following:
+
+```
+	/regex/  : spaces only permitted if it is the only argument
+	on       : show only timers that are active (default is all)
+	off      : show only timers that are inactive (default is all)
+	left	 : change duration to reflect time left instead of total time
+	-t       : sort by stop time, oldest stop time at the top
+```
+
 In practice, I leave one terminal open to do `data entry/update` and in another
 I will run `dbq -p` which will either use `xmessage` to send a pop-up notice
 or send a one time notice to the terminal depending on whether or not
