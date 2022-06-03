@@ -41,6 +41,66 @@ You'll need a dbq.conf file:
 	echo "user=john" >> dbq.conf
 ```
 
+You'll need to create the dbq database:
+```
+	createdb -h mydbserver.example.com -O john dbq
+```
+
+If you don't want to have a password prompt every time, create the
+$HOME/.pgpass file with proper syntax:
+```
+	cd
+	touch .pgpass
+	chmod 600 .pgpass
+	echo mydbserver.example.com:*:*:john:supersecretpass >> .pgpass
+```
+
+Finally, you'll need to start it:
+
+```
+	$ dbq
+	dbinfo=>{user} = 'john'
+	dbinfo=>{dsn} = 'dbi:Pg:dbname=dbq;host=mydbserver.example.com'
+	dbinfo=>{pass} = ''
+	Connected to dsn 'dbi:Pg:dbname=dbq;host=mydbserver.example.com' .. dbms name 'PostgreSQL' ver '11.00.0700' .. oidname 'oid'
+	dbq> ls
+
+	Timer  Expired?  Duration    Stop Time           Description
+	dbq> add 
+	q name? spiffy reason
+	q dur? 1hour 1min 1sec
+	dbq> ls
+
+	Timer  Expired?  Duration    Stop Time           Description
+	    1. 0     1hour 1min 1sec 2022-06-03 17:58:05 spiffy reason
+	dbq> add
+	q name? curly moe show starts
+	q dur? 10min
+	dbq> ls /moe/
+
+	Timer  Expired?  Duration    Stop Time           Description
+	    2. 0              10mins 2022-06-03 17:07:26 curly moe show starts
+	dbq> ls -t
+
+	Timer  Expired?  Duration    Stop Time           Description
+	    2. 0              10mins 2022-06-03 17:07:26 curly moe show starts
+	    1. 0     1hour 1min 1sec 2022-06-03 17:58:05 spiffy reason
+	dbq> ls left -t
+
+	Timer  Expired?  Duration    Stop Time           Description
+	    2. 0        9mins 42secs 2022-06-03 17:07:26 curly moe show starts
+	    1. 0        1hour 21secs 2022-06-03 17:58:05 spiffy reason
+	dbq> quit
+	$
+```
+
+In practice, I leave one terminal open to do `data entry/update` and in another
+I will run `dbq -p` which will either use `xmessage` to send a pop-up notice
+or send a one time notice to the terminal depending on whether or not
+`DISPLAY` is set in the environment.
+
+If anyone actually uses this beyond me, reach out.  I do love feedback!
+
 Enjoy!
 
 Thanks,
