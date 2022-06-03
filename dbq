@@ -32,7 +32,7 @@ our $opt_p; # poll on/off
 
 $opt_c = $ENV{'HOME'}."/.config/dbq/dbq.conf";
 
-getopts('pv:');
+getopts('c:pv:');
 
 our $v = $opt_v;
 
