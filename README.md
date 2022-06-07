@@ -120,6 +120,8 @@ del <filter>    :  delete a timer entry entirely
 	-t       : sort by stop time, oldest stop time at the top
 ```
 
+Note 'regex' is case sensitive.
+
 In practice, I leave one terminal open to do `data entry/update` and in another
 I will run `dbq -p` which will:
   - use `xmessage` to send a pop-up notice (if $DISPLAY is set)
