@@ -54,7 +54,8 @@ my $dbprep = { };
 my $memcache = { };
 
 my $r = ReadConf->new;
-my $config = $r->readconf($opt_c)->{_};
+our $conf = $r->readconf($opt_c);
+my $config = $conf->{_};
 if (defined($config)) {
 	foreach my $id (keys %{$dbinfo}) {
 		if (defined($config->{$id})) {
@@ -114,7 +115,6 @@ while (1) {
 		del($1);
 		next;
 	}
-	# arguments .. aka 'ls expired' or 'del 3'
 }
 
 exit(0);
@@ -640,9 +640,8 @@ sub notify {
 
 	if (defined($ENV{'DISPLAY'})) {
 		xmessage($d, $deltastr, $newdate);
-	} else {
-		tmessage($d, $deltastr, $newdate);
 	}
+	tmessage($d, $deltastr, $newdate);
 }
 sub tmessage {
 	my ($d, $deltastr, $newdate) = @_;
@@ -657,8 +656,20 @@ sub tmessage {
 	$memcache->{$id} = $d;
 
 	printf " %s --> %s : %s\n", $newdate->printf("%Y%m%dT%H:%M:%S"), $deltastr, $d->{name};
-	my $str = sprintf("dremind +2sec '%s'", $d->{name});
-	system($str);
+
+	my $wh = $conf->{discord}->{webhook};
+	my $notify = $conf->{discord}->{notify};
+	if (defined($wh)) {
+		my $ats = "";
+		if (defined($notify)) {
+			foreach my $uid (split(/,/,$notify)) {
+				$ats .= " <\@${uid}>";
+			}
+		}
+		my $str = sprintf("dwebhook %s '%s' '%s%s'", $wh, 'dbq',
+			$d->{name}, $ats);
+		system($str);
+	}
 }
 
 sub xmessage {
