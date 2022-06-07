@@ -121,9 +121,10 @@ del <filter>    :  delete a timer entry entirely
 ```
 
 In practice, I leave one terminal open to do `data entry/update` and in another
-I will run `dbq -p` which will either use `xmessage` to send a pop-up notice
-or send a one time notice to the terminal depending on whether or not
-`DISPLAY` is set in the environment.
+I will run `dbq -p` which will:
+  - use `xmessage` to send a pop-up notice (if $DISPLAY is set)
+  - send a one liner to the terminal
+  - call 'dwebhook <webhook> <from> <msg>' if {discord}->{webhook} is set in dbq.conf
 
 If anyone actually uses this beyond me, reach out.  I do love feedback!
 
