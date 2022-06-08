@@ -638,10 +638,10 @@ sub notify {
 	$delta->parse($deltastr);
 	my $newdate = $datenow->calc($delta, 0);
 
+	tmessage($d, $deltastr, $newdate);
 	if (defined($ENV{'DISPLAY'})) {
 		xmessage($d, $deltastr, $newdate);
 	}
-	tmessage($d, $deltastr, $newdate);
 }
 sub tmessage {
 	my ($d, $deltastr, $newdate) = @_;
