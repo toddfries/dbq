@@ -683,7 +683,7 @@ sub xmessage {
 	$cmd .= " -buttons Snooze:0,Dismiss:1,Restart:2";
 	$cmd .= " -default Snooze ";
 	$cmd .= $d->{name}.", time: $deltastr";
-	open(XM,"$cmd|");
+	open(XM,"$cmd 2> /dev/null |");
 	my $line;
 	while(<XM>) {
 		chomp($line = $_);
