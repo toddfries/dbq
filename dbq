@@ -187,16 +187,27 @@ sub polldb {
 	}
 	exit(0);
 }
-
+# 0 = on
+# 1 = off
 sub on {
-	_onoff(0, @_);
+	_onoff(0, 0, @_);
 }
 sub off {
-	_onoff(1, @_);
+	_onoff(0, 1, @_);
 }
 
+# batch version
+sub bon {
+	_onoff(1, 0, @_);
+}
+sub boff {
+	_onoff(1, 1, @_);
+}
+
+# 
+
 sub _onoff {
-	my ($state, $args) = @_;
+	my ($batch, $state, $args) = @_;
 	my $sname;
 	if ($state == 1) {
 		$sname = "off";
@@ -217,11 +228,27 @@ sub _onoff {
 	my $id;
 	if ($#ids == 0) {
 		my $one = $ids[0]->{id};
-		$id = ask('Turn '.$sname.' which id (#, break) ['.$one.'] ? ');
-		if ($id =~ /^\s?$/) {
-			$id = $one;
+		if ($batch == 1) {
+			if ($one eq $args) {
+				$id = $one;
+			} else {
+				printf "_onoff: Oops, batch == %d && one = %s && args = %s\n",
+					$batch, $one, $args;
+				return;
+			}
+		} else {
+			$id = ask('Turn '.$sname.' which id (#, break) ['
+			     .$one.'] ? ');
+			if ($id =~ /^\s?$/) {
+				$id = $one;
+			}
 		}
 	} else {
+		if ($batch == 1) {
+			printf "_onoff: Oops, batch == %d && \$#ids = %d\n",
+				$batch, $#ids;
+			return;
+		}
 		$id = ask('Turn '.$sname.' which id (#, break)? ');
 	}
 	if ($id eq "break") {
@@ -241,7 +268,7 @@ sub _onoff {
 
 	my ($secs,$stop, $dstr);
 
-	if ($state == 0) {
+	if ($state == 0 && $batch == 0) {
 
 		$dstr = ask('q dur "'.$match->{name}.'" ['.secstohuman($match->{dur}).']? ');
 		$dstr =~ s/^\s+//;
@@ -429,6 +456,7 @@ sub ls {
 	my $filter = "";
 	my $sort = "id";
 	my $durtype = "dur"; # dur or left
+	my $id;
 	my @ids;
 	if (defined($args)) {
 		$args =~ s/^\s+//;
@@ -459,7 +487,18 @@ sub ls {
 					$re = $1;
 					next;
 				}
+				if ($arg =~ /^([0-9]+)$/) {
+					$id = $1;
+					next;
+				}
 				printf "ls: unmatched arg '%s'\n", $arg;
+			}
+			if (defined($id)) {
+				if (length($filter) > 0) {
+					$filter .= " AND id = ${id}";
+				} else {
+					$filter .= " id = ${id}";
+				}
 			}
 			if (length($filter) > 0) {
 				$filter = " WHERE".$filter;
@@ -689,7 +728,8 @@ sub xmessage {
 		chomp($line = $_);
 		printf "returned '%s' for %s\n", $line, $d->{name};
 		if ($line eq "Dismiss") {
-			dismiss($d);
+			#dismiss($d);
+			boff($d->{id});
 			last;
 		}
 		if ($line eq "Restart") {
