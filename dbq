@@ -474,7 +474,7 @@ sub ls {
 	}
 	# header:
 	#            '   11. 0 100day 59min 59secs 2022-09-04 14:35:30 testing2'
-	my $header = "Timer  Expired?  Duration    Stop Time           Description";
+	my $header = "Timer  Expired?    Duration     Stop Time           Description";
 	printf "\n%s\n", $header;
 
 	my $d;
@@ -509,7 +509,7 @@ sub ls {
 
 		# '100day 59min 59secs' is 19c
 
-		printf "%5d. %d %19s %s %s\n", $d->{id},
+		printf "%5d. %d %22s %s %s\n", $d->{id},
 			$d->{triggered},
 			$dstr, $d->{stop}, $d->{name};
 	}
@@ -736,26 +736,26 @@ sub secstohuman {
 
 		my $dstr = "";
 		if ($day > 0) {
-			$dstr .= " ${day}days";
+			$dstr .= sprintf " %2ddays", $day;
 		} elsif ($day == 1) {
-			$dstr .= " ${day}day";
+			$dstr .= sprintf " %2dday", $day;
 		}
 		if ($hour > 1) {
-			$dstr .= " ${hour}hours";
+			$dstr .= sprintf " %2dhours", $hour;
 		} elsif ($hour == 1) {
-			$dstr .= " ${hour}hour";
+			$dstr .= sprintf " %2dhour", $hour;
 		}
 		if ($min > 1) {
-			$dstr .= " ${min}mins";
+			$dstr .= sprintf " %2dmins", $min;
 		} elsif ($min == 1) {
-			$dstr .= " ${min}min";
+			$dstr .= sprintf " %2dmin", $min;
 		}
 		if ($sec > 1) {
-			$dstr .= " ${sec}secs";
+			$dstr .= sprintf " %2dsecs", $sec;
 		} elsif ( $sec == 1) {
-			$dstr .= " ${sec}sec";
+			$dstr .= sprintf " %2dsec", $sec;
 		} elsif ($sec < 1 && length($dstr) < 1) {
-			$dstr .= " ${sec}secs";
+			$dstr .= sprintf " %2dsecs", $sec;
 		}
 
 		$dstr =~ s/^\s+//;
