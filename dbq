@@ -127,7 +127,15 @@ sub add {
 	my $h = db_prep_alloc('dbq_insert', $q);
 
 	my $name = ask('q name? ');
+	if ($name =~ /^\s+$/) {
+		print "add needs a non blank name, aborting!";
+		return;
+	}
 	my $str  = ask('q dur? ');
+	if ($str =~ /^\s+$/) {
+		print "add needs a non blank duration, aborting!";
+		return;
+	}
 
 	my ($secs,$stop) = durtoss($str);
 
