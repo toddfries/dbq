@@ -520,8 +520,8 @@ sub ls {
 		return;
 	}
 	# header:
-	#            '   11. 0 100day 59min 59secs 2022-09-04 14:35:30 testing2'
-	my $header = "Timer  Expired?    Duration     Stop Time           Description";
+	#            '   11. 0 131days 18hours  4mins 27secs 2022-09-04 14:35:30 testing2'
+	my $header = "Timer  Expired?      Duration          Stop Time           Description";
 	printf "\n%s\n", $header;
 
 	my $d;
@@ -554,9 +554,9 @@ sub ls {
 		}
 
 
-		# '100day 59min 59secs' is 19c
+		# '131days 18hours  4mins 27secs' is 29c
 
-		printf "%5d. %d %22s %s %s\n", $d->{id},
+		printf "%5d. %d %29s %s %s\n", $d->{id},
 			$d->{triggered},
 			$dstr, $d->{stop}, $d->{name};
 	}
