@@ -686,7 +686,8 @@ sub notify {
 	my $newdate = $datenow->calc($delta, 0);
 
 	tmessage($d, $deltastr, $newdate);
-	if (defined($ENV{'DISPLAY'})) {
+	# tmp/locked is a ttf invention, dont dislpay if screen is locked!
+	if (defined($ENV{'DISPLAY'}) && ! -f $ENV{'HOME'}."/tmp/locked") {
 		xmessage($d, $deltastr, $newdate);
 	}
 }
