@@ -206,7 +206,7 @@ sub polldb {
 	while (1) {
 		my $sth = $db->doquery($q);
 		if (!defined($sth) || $sth == -1) {
-			return;
+			goto end;
 		}
 
 		$datenow->parse("now");
@@ -229,6 +229,7 @@ sub polldb {
 		}
 		sleep(5);
 	}
+end:
 	exit(0);
 }
 # 0 = on
