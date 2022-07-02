@@ -29,10 +29,11 @@ use Term::ReadLine;
 our $opt_v; # verbose
 our $opt_c; # config file
 our $opt_p; # poll on/off
+our $opt_o; # poll once
 
 $opt_c = $ENV{'HOME'}."/.config/dbq/dbq.conf";
 
-getopts('c:pv:');
+getopts('c:pov:');
 
 our $v = $opt_v;
 
@@ -75,6 +76,10 @@ init_db($dbinfo);
 if (defined($opt_p)) {
 	polldb();
 	# notreached
+}
+
+if (defined($opt_o)) {
+	pollonce();
 }
 
 our $term = Term::ReadLine->new('dbq', *STDIN, *STDOUT);
@@ -162,6 +167,37 @@ sub add {
 	}
 }
 
+sub pollonce {
+	my $q = "SELECT * from dbq where triggered = 0 order by stop";
+	my $d;
+	my $datenow = Date::Manip::Date->new();
+	my $datedb  = Date::Manip::Date->new();
+
+		my $sth = $db->doquery($q);
+		if (!defined($sth) || $sth == -1) {
+			return;
+		}
+
+		$datenow->parse("now");
+		while ($d = $sth->fetchrow_hashref) {
+			if ($d->{triggered} > 0) {
+				next;
+			}
+			$datedb->parse($d->{stop});
+			my $cret = $datenow->cmp($datedb);
+			if ($v>0) {
+			printf "%s  %s  %s : %s\n",
+				$datenow->printf("%Y-%m-%dT%H:%M:%S"),
+				$cret,
+				$datedb->printf("%Y-%m-%dT%H:%M:%S"),
+				$d->{name};
+			}
+			if ($cret >= 0) {
+				notify($d);
+			}
+		}
+	exit(0);
+}
 sub polldb {
 	my $q = "SELECT * from dbq where triggered = 0 order by stop";
 	my $d;
