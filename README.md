@@ -37,6 +37,7 @@ You'll need a dbq.conf file:
 
 ```
 	mkdir -p $HOME/.config/dbq
+	cd $HOME/.config/dbq
 	echo "dsn=dbi:Pg:dbname=dbq;host=mydbserver.example.com" > dbq.conf
 	echo "user=john" >> dbq.conf
 ```
