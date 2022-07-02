@@ -175,7 +175,7 @@ sub pollonce {
 
 		my $sth = $db->doquery($q);
 		if (!defined($sth) || $sth == -1) {
-			return;
+			goto end;
 		}
 
 		$datenow->parse("now");
@@ -196,6 +196,7 @@ sub pollonce {
 				notify($d);
 			}
 		}
+	end:
 	exit(0);
 }
 sub polldb {
