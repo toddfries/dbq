@@ -87,7 +87,12 @@ $term->ornaments(0);
 
 my $line;
 while (1) {
-	chomp($line = $term->readline('dbq> '));
+	my $input = $term->readline('dbq> ');
+	if (!defined($input)) {
+		print "read: <undef>\n";
+		last;
+	}
+	chomp($line = $input);
 	$line =~ s/^\s+//;
 	$line =~ s/\s+$//;
 	if ($v > 0) {
@@ -120,6 +125,7 @@ while (1) {
 		del($1);
 		next;
 	}
+	printf "Unhandled: '%s'\n", $line;
 }
 
 exit(0);
@@ -741,6 +747,11 @@ sub tmessage {
 	}
 	$memcache->{$id} = $d;
 
+	my $sound = $conf->{audio}->{sound};
+	if (defined($sound)) {
+		system("aucat -i $sound");
+	}
+
 	printf " %s --> %s : %s\n", $newdate->printf("%Y%m%dT%H:%M:%S"), $deltastr, $d->{name};
 
 	my $wh = $conf->{discord}->{webhook};
@@ -815,7 +826,7 @@ sub update_trigger_q {
 	return db_prep_alloc('dbq_update_trigger', $q);
 }
 	
-
+# also seen in gasbuddy
 sub secstohuman {
 		my ($duration) = @_;
 
