@@ -325,6 +325,11 @@ sub _onoff {
 		$dstr = ask('q dur "'.$match->{name}.'" ['.secstohuman($match->{dur}).']? ');
 		$dstr =~ s/^\s+//;
 		$dstr =~ s/\s+$//;
+		# the beginning of @absolute_time_string support
+		if ($dstr =~ /^\@(.*)$/) {
+			#my $end = Date::Manip->new();
+			#$end->parse( $dstr );
+		}
 	}
 	my ($q,$h,$i,$rv);
 	if ($state == 1) {
@@ -779,7 +784,9 @@ sub xmessage {
 	$cmd .= " -print";
 	$cmd .= " -buttons Snooze:0,Dismiss:1,Restart:2";
 	$cmd .= " -default Snooze ";
+	$cmd .= "'";
 	$cmd .= $d->{name}.", time: $deltastr";
+	$cmd .= "'";
 	open(XM,"$cmd 2> /dev/null |");
 	my $line;
 	while(<XM>) {
