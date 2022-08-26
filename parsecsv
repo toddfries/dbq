@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+
+# Copyright (c) 2022 Todd T. Fries <todd@fries.net>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+use strict;
+use warnings;
+
+use Date::Manip;
+use Getopt::Std;
+
+# definitions
+our $opt_d; # how many days early to reorder
+our $opt_p; # toggle 'show past due'
+our $opt_v; # verbosity
+
+# defaults
+$opt_d = 6;
+$opt_p = 0;
+$opt_v = 0;
+
+my $d = Date::Manip::Date->new();
+my $delta = Date::Manip::Delta->new();
+my $subtract = 0;
+
+my $dfmt = "%a %b %e %Y";
+
+$d->parse("now");
+my $nows = $d->printf("%s");
+
+foreach my $fn (@ARGV) {
+	if (! -f $fn) {
+		printf "Specified file '%s' EEXIST\n", $fn;
+		next;
+	}
+	if (! open(F, "<", $fn)) {
+		printf "Specified file '%s' !OPEN\n", $fn;
+		next;
+	}
+	my $file;
+	while(<F>) {
+		chomp($file = $_);
+		my @vals = split(/,/,$file);
+		my $filldate = $vals[0];
+		my $rx = $vals[1];
+		my $who = $vals[2];
+		my $drug = $vals[3];
+		my $amount = $vals[4];
+		my $unit = $vals[5];
+		my $count = $vals[6];
+		my $days = $vals[8];
+		if (!defined($filldate)) {
+			next;
+		}
+		if (length($filldate) < 1) {
+			next;
+		}
+		# skip header
+		if ($filldate =~ /^[A-Z]/) {
+			next;
+		}
+		if (length($days) < 1) {
+			next;
+		}
+		if (! ($days =~ /^[0-9]/)) {
+			next;
+		}
+		my $redays = $days - $opt_d;
+		$d->parse($filldate);
+		$delta->parse("${redays}day");
+		my $reorder = $d->calc($delta, $subtract);
+
+		my $reorders = $reorder->printf("%s");
+		if ($reorders < $nows && $opt_p < 1) {
+			next;
+		}
+		if ($opt_v > 0) {
+			printf "%s %s %s %s %s %s\n", $filldate, $rx, $who, $drug, $count, $days;
+			printf "     reorder date: %s + %s days = %s\n", $d->printf($dfmt), $days, $reorder->printf($dfmt);
+			print "\n";
+		}
+		print  "add\n";
+		printf "reorder rx %s for %s (%s %s%s) filled %s for %s days\n", $rx, $who, $drug, $amount, $unit, $d->printf($dfmt), $days;
+		printf "%s\n", $reorders-$nows;
+		#printf ".. aka on %s\n", $reorder->printf($dfmt);
+		#printf "\n";
+	}
+}
