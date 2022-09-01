@@ -784,7 +784,7 @@ sub tmessage {
 			$text .= "...";
 		}
 		
-		$text .= " @".$newdate->printf("%H:%M:%S on %m/%d/%Y");
+		$text .= " \@".$newdate->printf("%H:%M:%S on %m/%d/%Y");
 		$cmd =~ s/%text%/${text}/g;
 
 		printf "exec(%s)\n", $cmd;
