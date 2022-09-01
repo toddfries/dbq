@@ -772,6 +772,25 @@ sub tmessage {
 			$d->{name}, $ats);
 		system($str);
 	}
+	foreach my $var (keys %{$conf->{commands}}) {
+		if (! ($var =~ /^cmd[0-9]+$/)) {
+			next;
+		}
+		my $cmd = $conf->{commands}->{$var};
+		printf "cmd %s = '%s'\n", $var, $cmd;
+		my $text = $d->{name};
+		if (length($text) > 134) {
+			$text = substr($text, 0, 134);
+			$text .= "...";
+		}
+		
+		$text .= " @".$newdate->printf("%H:%M:%S on %m/%d/%Y");
+		$cmd =~ s/%text%/${text}/g;
+
+		printf "exec(%s)\n", $cmd;
+		system($cmd);
+		
+	}
 }
 
 sub xmessage {
