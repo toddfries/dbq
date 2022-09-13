@@ -743,6 +743,8 @@ sub notify {
 sub tmessage {
 	my ($d, $deltastr, $newdate) = @_;
 
+	my $message = $d->{name};
+
 	my $id = $d->{id};
 	if (defined($memcache->{$id})) {
 		if ($d->{stop} eq $memcache->{$id}->{stop}) {
@@ -769,18 +771,28 @@ sub tmessage {
 			}
 		}
 		my $str = sprintf("dwebhook %s '%s' '%s%s'", $wh, 'dbq',
-			$d->{name}, $ats);
+			$message, $ats);
 		system($str);
 	}
 	foreach my $var (keys %{$conf->{commands}}) {
-		if (! ($var =~ /^cmd[0-9]+$/)) {
+		$var =~ /^cmd([0-9]+)$/;
+		my $cc = $1;
+		if (! defined($cc)) {
 			next;
+		}
+		# re(gex) name
+		my $rename = "re".$cc;
+		my $restr = $conf->{commands}->{$rename};
+		if (defined($restr)) {
+			if (! ($message =~ /${restr}/)) {
+				next;
+			}
 		}
 		my $cmd = $conf->{commands}->{$var};
 		printf "cmd %s = '%s'\n", $var, $cmd;
-		my $text = $d->{name};
-		if (length($text) > 134) {
-			$text = substr($text, 0, 134);
+		my $text = $message;
+		if (length($message) > 134) {
+			$text = substr($message, 0, 134);
 			$text .= "...";
 		}
 		
