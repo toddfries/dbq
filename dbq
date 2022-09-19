@@ -784,22 +784,30 @@ sub tmessage {
 		my $rename = "re".$cc;
 		my $restr = $conf->{commands}->{$rename};
 		if (defined($restr)) {
-			if (! ($message =~ /${restr}/)) {
+			if (! ($message =~ /${restr}/i)) {
 				next;
 			}
 		}
 		my $cmd = $conf->{commands}->{$var};
 		printf "cmd %s = '%s'\n", $var, $cmd;
 		my $text = $message;
-		if (length($message) > 134) {
-			$text = substr($message, 0, 134);
-			$text .= "...";
+		# I think the app ought to limit length if necessary, yes?
+		#if (length($message) > 134) {
+		#	$text = substr($message, 0, 134);
+		#	$text .= "...";
+		#}
+
+		my $fmtname = "fmt".$cc;
+		my $fmt = $conf->{commands}->{$fmtname};
+		if (!defined($fmt)) {
+			$fmt = "%H:%M:%S on %m/%d/%Y %N";
 		}
 		
-		$text .= " \@".$newdate->printf("%H:%M:%S on %m/%d/%Y");
+		$text .= " at ".$newdate->printf($fmt);
 		$cmd =~ s/%text%/${text}/g;
 
 		printf "exec(%s)\n", $cmd;
+		printf "newdate tz = %s\n", $newdate->printf("%Z");
 		system($cmd);
 		
 	}
