@@ -26,7 +26,7 @@ our $opt_p; # toggle 'show past due'
 our $opt_v; # verbosity
 
 # defaults
-$opt_d = 6;
+$opt_d = 3; # XXX this may be prescrption specific
 $opt_p = 0;
 $opt_v = 0;
 
