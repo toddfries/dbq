@@ -576,7 +576,7 @@ sub ls {
 	my $d;
 	while ($d = $sth->fetchrow_hashref) {
 		if (defined($re)) {
-			if (! ($d->{name} =~ /${re}/)) {
+			if (! ($d->{name} =~ /${re}/i)) {
 				next;
 			}
 		}
