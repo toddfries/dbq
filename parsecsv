@@ -30,6 +30,8 @@ $opt_d = 3; # XXX this may be prescrption specific
 $opt_p = 0;
 $opt_v = 0;
 
+getopts('d:pv');
+
 my $d = Date::Manip::Date->new();
 my $delta = Date::Manip::Delta->new();
 my $subtract = 0;
@@ -51,15 +53,16 @@ foreach my $fn (@ARGV) {
 	my $file;
 	while(<F>) {
 		chomp($file = $_);
-		my @vals = split(/,/,$file);
+		my @vals = split(/\s*,\s*/,$file);
 		my $filldate = $vals[0];
-		my $rx = $vals[1];
-		my $who = $vals[2];
-		my $drug = $vals[3];
-		my $amount = $vals[4];
-		my $unit = $vals[5];
-		my $count = $vals[6];
-		my $days = $vals[8];
+		my $rx = $vals[2];
+		my $who = $vals[3];
+		my $drug = $vals[4];
+		my $amount = $vals[5];
+		my $unit = $vals[6];
+		my $count = $vals[8];
+		my $days = $vals[9];
+		my $dr = $vals[20];
 		if (!defined($filldate)) {
 			next;
 		}
@@ -76,6 +79,9 @@ foreach my $fn (@ARGV) {
 		if (! ($days =~ /^[0-9]/)) {
 			next;
 		}
+		if (!defined($dr)) {
+			$dr = "<drwho?>";
+		}
 		my $redays = $days - $opt_d;
 		$d->parse($filldate);
 		$delta->parse("${redays}day");
@@ -91,7 +97,7 @@ foreach my $fn (@ARGV) {
 			print "\n";
 		}
 		print  "add\n";
-		printf "reorder rx %s for %s (%s %s%s) filled %s for %s days\n", $rx, $who, $drug, $amount, $unit, $d->printf($dfmt), $days;
+		printf "reorder rx %s for %s (%s %s%s) filled %s for %s days (%s)\n", $rx, $who, $drug, $amount, $unit, $d->printf($dfmt), $days, $dr;
 		printf "%s\n", $reorders-$nows;
 		#printf ".. aka on %s\n", $reorder->printf($dfmt);
 		#printf "\n";
