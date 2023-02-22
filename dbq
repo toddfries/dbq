@@ -189,6 +189,9 @@ sub pollonce {
 			if ($d->{triggered} > 0) {
 				next;
 			}
+			if (!defined($d->{stop})) {
+				die "d->{stop} is undef for id ".$d->{id};
+			}
 			$datedb->parse($d->{stop});
 			my $cret = $datenow->cmp($datedb);
 			if ($v>0) {
@@ -220,6 +223,9 @@ sub polldb {
 		while ($d = $sth->fetchrow_hashref) {
 			if ($d->{triggered} > 0) {
 				next;
+			}
+			if (!defined($d->{stop})) {
+				die "d->{stop} is undef for id ".$d->{id};
 			}
 			$datedb->parse($d->{stop});
 			my $cret = $datenow->cmp($datedb);
@@ -730,9 +736,15 @@ sub notify {
 	my $delta   = Date::Manip::Delta->new();
 
 	$datenow->parse("now");
-	my $deltastr = $d->{dur}."sec";
-	$delta->parse($deltastr);
-	my $newdate = $datenow->calc($delta, 0);
+	my ($deltastr, $newdate);
+
+	$deltastr = $d->{dur}."sec";
+	if ($d->{dur} == 0) {
+		$newdate = $datenow;
+	} else {
+		$delta->parse($deltastr);
+		$newdate = $datenow->calc($delta, 0);
+	}
 
 	tmessage($d, $deltastr, $newdate);
 	# tmp/locked is a ttf invention, dont dislpay if screen is locked!
@@ -753,6 +765,7 @@ sub tmessage {
 		}
 	}
 	$memcache->{$id} = $d;
+	printf "==> %d\n", $id;
 
 	my $sound = $conf->{audio}->{sound};
 	if (defined($sound)) {
@@ -769,6 +782,15 @@ sub tmessage {
 			foreach my $uid (split(/,/,$notify)) {
 				$ats .= " <\@${uid}>";
 			}
+		}
+		if (!defined($wh)) {
+			die "wh undef";
+		}
+		if (!defined($message)) {
+			die "message undef";
+		}
+		if (!defined($ats)) {
+			die "ats undef";
 		}
 		my $str = sprintf("dwebhook %s '%s' '%s%s'", $wh, 'dbq',
 			$message, $ats);
@@ -923,6 +945,10 @@ sub secstodhms {
 # Duration (from now) to Seconds and Stop Time
 sub durtoss {
 	my ($str) = @_;
+
+	if (!defined($str)) {
+		die "durtoss: str is undef";
+	}
 
 	my $date = Date::Manip::Date->new();
 	my $delta = Date::Manip::Delta->new();
