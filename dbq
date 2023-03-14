@@ -142,12 +142,7 @@ sub add {
 		print "add needs a non blank name, aborting!";
 		return;
 	}
-	my $str  = ask('q dur? ');
-	if ($str =~ /^\s+$/) {
-		print "add needs a non blank duration, aborting!";
-		return;
-	}
-
+	my $str  = ask_dur('q dur? ');
 	my ($secs,$stop) = durtoss($str);
 
 	if ($v>0) {
@@ -328,9 +323,7 @@ sub _onoff {
 
 	if ($state == 0 && $batch == 0) {
 
-		$dstr = ask('q dur "'.$match->{name}.'" ['.secstohuman($match->{dur}).']? ');
-		$dstr =~ s/^\s+//;
-		$dstr =~ s/\s+$//;
+		$dstr = ask_dur('q dur "'.$match->{name}.'" ['.secstohuman($match->{dur}).']? ');
 		# the beginning of @absolute_time_string support
 		if ($dstr =~ /^\@(.*)$/) {
 			#my $end = Date::Manip->new();
@@ -928,6 +921,36 @@ sub secstohuman {
 		$dstr =~ s/\s+$//;
 
 		return $dstr;
+}
+
+sub ask_dur {
+	my ($prompt) = @_;
+
+	my $str = ask($prompt);
+	if ($str =~ /^\s+$/) {
+		print "add needs a non blank duration, aborting!";
+		return;
+	}
+	$str =~ s/^\s+//;
+	$str =~ s/\s+$//;
+
+	my $newstr = "";
+	foreach my $tmp (split(/\s+/,$str)) {
+		$tmp =~ s/([0-9])s$/$1sec/;
+		$tmp =~ s/([0-9])m$/$1min/;
+		$tmp =~ s/([0-9])h$/$1hour/;
+		$tmp =~ s/([0-9])d$/$1day/;
+		$tmp =~ s/([0-9])w$/$1week/;
+		$tmp =~ s/([0-9])mo$/$1month/;
+		$tmp =~ s/([0-9])y$/$1year/;
+		$newstr .= " $tmp";
+	}
+	$newstr =~ s/^\s+//;
+	if ($newstr ne $str) {
+		printf "ask_dur: '%s' -> '%s'\n", $str, $newstr;
+		$str = $newstr;
+	}
+	return $str;
 }
 
 sub secstodhms {
