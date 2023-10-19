@@ -85,9 +85,14 @@ if (defined($opt_o)) {
 our $term = Term::ReadLine->new('dbq', *STDIN, *STDOUT);
 $term->ornaments(0);
 
+our $prefix="";
 my $line;
 while (1) {
-	my $input = $term->readline('dbq> ');
+	my $prompt = 'dbq> ';
+	if (length($prefix) > 0) {
+		$prompt = "(prefix='${prefix}') $prompt";
+	}
+	my $input = $term->readline($prompt);
 	if (!defined($input)) {
 		print "read: <undef>\n";
 		last;
@@ -97,6 +102,14 @@ while (1) {
 	$line =~ s/\s+$//;
 	if ($v > 0) {
 		printf "read: '%s'\n", $line;
+	}
+	if ($line =~ /^(pre)\s+(.*)/) {
+		$prefix = $2.".*";
+		next;
+	}
+	if ($line =~ /^(pre)$/) {
+		$prefix = "";
+		next;
 	}
 	if ($line =~ /^(exit|quit)$/) {
 		last;
@@ -520,7 +533,8 @@ sub ls {
 			printf "ls with args! '%s'\n", $args;
 		}
 		if ($args =~ /^\/(.*)\/$/) {
-			$re = $1;
+			$re = $prefix.$1;
+			printf "re = %s\n", $re;
 		} else {
 			foreach my $arg (split(/\s+/, $args)) {
 				if ($arg eq "on") {
@@ -539,8 +553,12 @@ sub ls {
 					$sort = "stop";
 					next;
 				}
+				if ($arg eq "-a") {
+					$sort = "name";
+					next;
+				}
 				if ($arg =~ /^\/(.*)\/$/) {
-					$re = $1;
+					$re = $prefix.$1;
 					next;
 				}
 				if ($arg =~ /^([0-9]+)$/) {
